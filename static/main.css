@@ -1,3 +1,30 @@
-p {
-  color: red;  
+a{
+  color: black!important;
+  text-decoration: none!important;
+}
+
+
+h1{
+  background-color: #FAB30D;
+  border-radius: 12px;
+  font-size: 1.5rem;
+  padding: 1rem 2rem;
+}
+
+header ul{
+  list-style: none;
+}
+
+header li{
+  margin: 0 1rem;
+  transition: all 0.3s ease-out;
+}
+
+header li a:hover{
+  color: #FAB30D!important;
+}
+
+main{
+  padding-top: 6rem;
+  text-align: center;
 }
