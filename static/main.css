@@ -24,7 +24,12 @@ header li a:hover{
   color: #FAB30D!important;
 }
 
-main{
+main.center{
   padding-top: 6rem;
   text-align: center;
+}
+
+.inputLabel{
+  display: block;
+  margin-top: 20px;
 }

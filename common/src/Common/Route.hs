@@ -16,28 +16,34 @@ import Prelude hiding (id, (.))
 import Control.Category
 -}
 
-import Data.Text (Text)
+import Data.Text (Text, unpack)
+import Data.Function
 import Data.Functor.Identity
 
 import Obelisk.Route
 import Obelisk.Route.TH
 
 data BackendRoute :: * -> * where
-  -- | Used to handle unparseable routes.
   BackendRoute_Missing :: BackendRoute ()
-  -- You can define any routes that will be handled specially by the backend here.
-  -- i.e. These do not serve the frontend, but do something different, such as serving static files.
+  BackendRoute_Container :: BackendRoute ()
 
 data FrontendRoute :: * -> * where
   FrontendRoute_Main :: FrontendRoute ()
   -- This type is used to define frontend routes, i.e. ones for which the backend will serve the frontend.
+
+checkedFullRouteEncoder
+  :: Encoder Identity Identity (R (FullRoute BackendRoute FrontendRoute)) PageName
+checkedFullRouteEncoder = checkEncoder fullRouteEncoder & \case
+  Left err -> error $ unpack err
+  Right encoder -> encoder
 
 fullRouteEncoder
   :: Encoder (Either Text) Identity (R (FullRoute BackendRoute FrontendRoute)) PageName
 fullRouteEncoder = mkFullRouteEncoder
   (FullRoute_Backend BackendRoute_Missing :/ ())
   (\case
-      BackendRoute_Missing -> PathSegment "missing" $ unitEncoder mempty)
+      BackendRoute_Missing -> PathSegment "missing" $ unitEncoder mempty
+      BackendRoute_Container -> PathSegment "container" $ unitEncoder mempty)
   (\case
       FrontendRoute_Main -> PathEnd $ unitEncoder mempty)
 
