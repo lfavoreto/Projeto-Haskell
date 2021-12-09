@@ -13,13 +13,6 @@ import Control.Monad.IO.Class (liftIO)
 import Common.Api
 import Data.Aeson.Text
 
-getConn :: ConnectInfo
-getConn = ConnectInfo "ec2-52-20-143-167.compute-1.amazonaws.com" --host
-                      5432 --port
-                      "mbemipijoqrjto" --user
-                      "0bfac7c56132252515fef97c706b5daf7d6471304c91e0d49c22b8c152a4c5bb" --password
-                      "d1o2eu4po5kjtn" --database
-
 migrationCont :: Query
 migrationCont = "CREATE TABLE IF NOT EXISTS containers\
   \ (id SERIAL PRIMARY KEY, nome TEXT NOT NULL, tipo TEXT NOT NULL, status TEXT NOT NULL, categoria TEXT NOT NULL)"
