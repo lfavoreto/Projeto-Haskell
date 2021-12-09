@@ -19,3 +19,11 @@ data Containers = Containers {
     statusContainer :: Text,
     categoriaContainer :: Text
 } deriving (Generic, ToJSON, FromJSON, ToRow, FromRow, Eq, Show)
+
+data Movimentacoes = Movimentacoes {
+    idMovimentacao :: Int,
+    navio :: Text,
+    movimentacao :: Text,
+    dataInicio :: Text,
+    dataFim :: Text
+} deriving (Generic, ToJSON, FromJSON, ToRow, FromRow, Eq, Show)

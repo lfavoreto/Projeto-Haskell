@@ -212,6 +212,183 @@ tabContainer ct = do
     el "td" (text $ statusContainer ct)
     el "td" (text $ categoriaContainer ct)
 
+
+
+getListReqMov :: XhrRequest ()
+getListReqMov = xhrRequest "GET" (getPath (BackendRoute_ListarMovimentacoes :/ ())) def
+
+getMovReq :: Int -> XhrRequest ()
+getMovReq mid = xhrRequest "GET" (getPath (BackendRoute_BuscarMovimentacoes :/ mid)) def
+
+reqMov :: ( DomBuilder t m
+      , Prerender js t m
+      ) => m ()
+reqMov = do
+  elAttr "div" ("class" =: "container") $ do
+    el "h2" $ text "Inserir Movimentação"
+    elAttr "div" ("class" =: "form-group") $ do
+      elAttr "p" ("class" =: "label") $ text "Navio:"
+      navio <- inputElement def
+      elAttr "p" ("class" =: "label") $ text "Movimentação:"
+      movimentacao <- inputElement def
+      elAttr "p" ("class" =: "label") $ text "dataInicio:"
+      dataInicio <- inputElement def
+      elAttr "p" ("class" =: "label") $ text "dataFim"
+      dataFim <- inputElement def
+      let mov = fmap (\((n,m),(i,f)) -> Movimentacoes 0 n m i f) (zipDyn (zipDyn (_inputElement_value navio) (_inputElement_value movimentacao)) (zipDyn (_inputElement_value dataInicio) (_inputElement_value dataFim)))
+      (submitBtn,_) <- el' "button" (text "Inserir")
+      let click = domEvent Click submitBtn
+      let movEvt = tag (current mov) click
+      _ :: Dynamic t (Event t (Maybe T.Text)) <- prerender
+          (pure never)
+          (fmap decodeXhrResponse <$> performRequestAsync (sendRequest (BackendRoute_Movimentacoes :/ ()) <$> movEvt))
+      return ()    
+
+tabRegistroMov :: (PostBuild t m, DomBuilder t m) => Dynamic t Movimentacoes -> m (Event t Acao)
+tabRegistroMov pr = do
+  el "tr" $ do
+    el "td" (dynText $ fmap (T.pack . show . idMovimentacao) pr)
+    el "td" (dynText $ fmap (T.pack . show . navio) pr)
+    el "td" (dynText $ fmap (T.pack . show . movimentacao) pr)
+    el "td" (dynText $ fmap (T.pack . show . dataInicio) pr)
+    el "td" (dynText $ fmap (T.pack . show . dataFim) pr)
+    evt <- fmap (fmap (const Perfil)) (elAttr "td" ("class" =: "ver") $ do button "Ver")
+    evt2 <- fmap (fmap (const Editar)) (elAttr "td" ("class" =: "editar") $ do button "Editar")
+    evt3 <- fmap (fmap (const Apagar)) (elAttr "td" ("class" =: "apagar") $ do button "Apagar")
+    return (attachPromptlyDynWith (flip ($)) (fmap idMovimentacao pr) (leftmost [evt,evt2,evt3]))
+
+reqTabelaMov :: ( DomBuilder t m
+            , Prerender js t m
+            , MonadHold t m
+            , MonadFix m
+            , PostBuild t m) => Workflow t m T.Text
+reqTabelaMov = Workflow $ do
+  elAttr "div" ("class" =: "container") $ do
+    el "h2" $ text "Movimentações" 
+    btn <- button "Listar"
+    movs :: Dynamic t (Event t (Maybe [Movimentacoes])) <- prerender
+      (pure never)
+      (fmap decodeXhrResponse <$> performRequestAsync (const getListReqMov <$> btn))
+    evt <- return (fmap (fromMaybe []) $ switchDyn movs)
+    dynP <- foldDyn (++) [] evt
+    tb <- elAttr "table" ("class" =: "table table-striped") $ do
+      elAttr "thead" ("class" =: "thead-dark") $ do
+        el "tr" $ do
+          elAttr "th" ("scope" =: "col") (text "Id")
+          elAttr "th" ("scope" =: "col") (text "Navio")
+          elAttr "th" ("scope" =: "col") (text "Movimentação")
+          elAttr "th" ("scope" =: "col") (text "dataInicio")
+          elAttr "th" ("scope" =: "col") (text "dataFim")
+          elAttr "th" ("scope" =: "col") blank
+          elAttr "th" ("scope" =: "col") blank
+          elAttr "th" ("scope" =: "col") blank
+      
+      el "tbody" $ do
+        simpleList dynP tabRegistroMov
+    tb' <- return $ switchDyn $ fmap leftmost tb
+    return ("", escolherPag <$> tb')
+    where
+      escolherPag (Perfil mid) = pagPerfilMov mid
+      escolherPag (Editar mid) = editarPerfilMov mid
+      escolherPag (Apagar mid) = apagarPerfilMov mid
+
+pagPerfilMov :: ( DomBuilder t m
+            , Prerender js t m
+            , MonadHold t m
+            , MonadFix m
+            , PostBuild t m) => Int -> Workflow t m T.Text
+pagPerfilMov mid = Workflow $ do
+  elAttr "div" ("class" =: "container div-ver") $ do
+    el "h2" $ text "Info"
+    elAttr "div" ("class" =: "id") $ do
+      el "span" $ text "Movimentação ID: "
+      el "span" $ text (T.pack $ show mid) 
+    btn <- button "Ver"
+    mov :: Dynamic t (Event t (Maybe Movimentacoes)) <- prerender
+      (pure never)
+      (fmap decodeXhrResponse <$> performRequestAsync (const (getMovReq mid) <$> btn))
+    mdyn <- holdDyn Nothing (switchDyn mov)
+    dynP <- return ((fromMaybe (Movimentacoes 0 "" "" "" "")) <$> mdyn)
+    ret <- button "Voltar"
+    elAttr "div" ("class" =: "dados") $ do
+      elAttr "div" ("class" =: "campo") $ do
+        el "span" (text "Navio: ")
+        el "span" (dynText $ fmap navio dynP)
+      elAttr "div" ("class" =: "campo") $ do
+        el "span" (text "Movimentação: ")
+        el "span" (dynText $ fmap movimentacao dynP)
+      elAttr "div" ("class" =: "campo") $ do
+        el "span" (text "Data Inicial: ")
+        el "span" (dynText $ fmap dataInicio dynP)
+      elAttr "div" ("class" =: "campo") $ do
+        el "span" (text "Data Final: ")
+        el "span" (dynText $ fmap dataFim dynP)
+    return ("" <> "", reqTabelaMov <$ ret)
+
+editarPerfilMov :: ( DomBuilder t m
+            , Prerender js t m
+            , MonadHold t m
+            , MonadFix m
+            , PostBuild t m) => Int -> Workflow t m T.Text
+editarPerfilMov mid = Workflow $ do
+  elAttr "div" ("class" =: "container div-ver") $ do
+    el "h2" $ text "Editar"
+    elAttr "div" ("class" =: "id") $ do
+      el "span" $ text "Movimentação ID: "
+      el "span" $ text (T.pack $ show mid) 
+    btn <- button "Mostrar"
+    submitBtn <- button "Salvar"
+    elAttr "div" ("class" =: "form-group") $ do
+      mov :: Dynamic t (Event t (Maybe Movimentacoes)) <- prerender
+        (pure never)
+        (fmap decodeXhrResponse <$> performRequestAsync (const (getMovReq mid) <$> btn))
+      mdyn <- return (switchDyn mov)
+      dynE <- return ((fromMaybe (Movimentacoes 0 "" "" "" "")) <$> mdyn)
+
+      elAttr "p" ("class" =: "label") $ text "Navio"
+      navio <- inputElement $ def & inputElementConfig_setValue .~ (fmap navio dynE)
+      elAttr "p" ("class" =: "label") $ text "Movimentação"
+      movimentacao <- inputElement $ def & inputElementConfig_setValue .~ (fmap movimentacao dynE)
+      elAttr "p" ("class" =: "label") $ text "Data Inicial"
+      dataInicio <- inputElement $ def & inputElementConfig_setValue .~ (fmap dataInicio dynE)
+      elAttr "p" ("class" =: "label") $ text "Data Final"
+      dataFim <- inputElement $ def & inputElementConfig_setValue .~ (fmap dataFim dynE)
+
+      let mov = fmap (\((n,m),(i,f)) -> Movimentacoes 0 n m i f) (zipDyn (zipDyn (_inputElement_value navio) (_inputElement_value movimentacao)) (zipDyn (_inputElement_value dataInicio) (_inputElement_value dataFim)))
+      let movEvt = tag (current mov) submitBtn
+      _ :: Dynamic t (Event t (Maybe T.Text)) <- prerender
+          (pure never)
+          (fmap decodeXhrResponse <$> performRequestAsync (sendRequest (BackendRoute_EditarMovimentacoes :/ mid) <$> movEvt))
+      return ("" <> "", reqTabelaMov <$ submitBtn)
+
+apagarPerfilMov :: ( DomBuilder t m
+            , Prerender js t m
+            , MonadHold t m
+            , MonadFix m
+            , PostBuild t m) => Int -> Workflow t m T.Text
+apagarPerfilMov mid = Workflow $ do
+  elAttr "div" ("class" =: "container div-ver") $ do
+    el "h2" $ text "Apagar?"
+    elAttr "div" ("class" =: "id") $ do
+      el "span" $ text "Movimentação ID: "
+      el "span" $ text (T.pack $ show mid)
+    btn <- button "Apagar"
+    ret <- button "Voltar"
+    cont :: Dynamic t (Event t (Maybe T.Text)) <- prerender
+      (pure never)
+      (fmap decodeXhrResponse <$> performRequestAsync (sendRequest (BackendRoute_ApagarMovimentacoes :/ mid) <$> btn))
+    return ("" <> "", reqTabelaMov <$ ret)
+
+reqListaMov :: ( DomBuilder t m
+              , Prerender js t m
+              , MonadHold t m
+              , MonadFix m
+              , PostBuild t m
+              , MonadFix m) => m ()
+reqListaMov = do
+  r <- workflow reqTabelaMov
+  el "div" (dynText r)
+
 home :: DomBuilder t m => m ()
 home = do
   elAttr "main" ("class" =: "center") $ do
@@ -220,22 +397,6 @@ home = do
       el "ul" $ do
         el "li" $ text "Lucas Favoreto Novoa Otero Machado da Costa"
         el "li" $ text "Lucas Santos Santana da Silva"
-
-pagina2 :: DomBuilder t m => m ()
-pagina2 = do
-  elAttr "main" ("class" =: "center") $ do
-    elAttr "div" ("class" =: "container") $ do
-      el "h2" $ text "Movimentações"
-      elAttr "img" ("src" =: static @"images.jpeg") blank
-      el "h3" $ text "Página em Construção"
-
-pagina3 :: DomBuilder t m => m ()
-pagina3 = do
-  elAttr "main" ("class" =: "center") $ do
-    elAttr "div" ("class" =: "container") $ do
-      el "h2" $ text "Destinos"
-      elAttr "img" ("src" =: static @"images.jpeg") blank
-      el "h3" $ text "Página em Construção"
 
 data Pagina = Pagina1 | Pagina2 | Pagina3 | Pagina4 | Pagina5 | Pagina6 | Pagina7
 
@@ -251,8 +412,8 @@ menuLi = do
     p2 <- clickLi Pagina2 "Containers"
     p3 <- clickLi Pagina3 "Inserir Container"
     p4 <- clickLi Pagina4 "Movimentações"
-    p5 <- clickLi Pagina4 "Inserir Movimentação"
-    p6 <- clickLi Pagina6 "Destions"
+    p5 <- clickLi Pagina5 "Inserir Movimentação"
+    p6 <- clickLi Pagina6 "Destinos"
     p7 <- clickLi Pagina7 "Inserir Destino"
     return (leftmost [p1, p2, p3, p4, p5, p6, p7])
   holdDyn Pagina1 evs
@@ -264,8 +425,8 @@ currPag p =
           Pagina1 -> home
           Pagina2 -> reqListaCont
           Pagina3 -> reqCont
-          Pagina4 -> home
-          Pagina5 -> home
+          Pagina4 -> reqListaMov
+          Pagina5 -> reqMov
           Pagina6 -> home
           Pagina7 -> home
 

@@ -13,10 +13,20 @@ import Control.Monad.IO.Class (liftIO)
 import Common.Api
 import Data.Aeson.Text
 
+getConn :: ConnectInfo
+getConn = ConnectInfo "" --host
+                      5432 --port
+                      "" --user
+                      "" --password
+                      "" --database
 
 migrationCont :: Query
 migrationCont = "CREATE TABLE IF NOT EXISTS containers\
   \ (id SERIAL PRIMARY KEY, nome TEXT NOT NULL, tipo TEXT NOT NULL, status TEXT NOT NULL, categoria TEXT NOT NULL)"
+
+migrationMov :: Query
+migrationMov = "CREATE TABLE IF NOT EXISTS movimentacoes\
+  \ (id SERIAL PRIMARY KEY, navio TEXT NOT NULL, movimentacao TEXT NOT NULL, dataInicio TEXT NOT NULL, dataFim TEXT NOT NULL)"
 
 backend :: Backend BackendRoute FrontendRoute
 backend = Backend
@@ -73,6 +83,59 @@ backend = Backend
                     execute dbcon 
                             "INSERT INTO containers (nome,tipo,status,categoria) VALUES (?,?,?,?)" 
                             (nomeContainer cont, tipoContainer cont, statusContainer cont, categoriaContainer cont)
+                  modifyResponse $ setResponseStatus 200 "OK"
+                Nothing -> modifyResponse $ setResponseStatus 500 "Erro" 
+
+            BackendRoute_EditarMovimentacoes :/ mid -> method POST $ do
+              movimentacoes <- A.decode <$> readRequestBody 2000
+              case movimentacoes of
+                Just mov -> do
+                  liftIO $ do
+                    execute_ dbcon migrationMov
+                    execute dbcon "UPDATE movimentacoes SET navio = ?, \
+                                  \ movimentacao = ?, dataInicio = ?, dataFim = ? WHERE id = ?"
+                                  (navio mov, movimentacao mov, dataInicio mov, dataFim mov, mid)
+                  modifyResponse $ setResponseStatus 200 "OK"
+                Nothing -> modifyResponse $ setResponseStatus 500 "ERRO"
+
+            BackendRoute_ListarMovimentacoes :/ () -> method GET $ do
+              res :: [Movimentacoes] <- liftIO $ do
+                execute_ dbcon migrationMov
+                query_ dbcon "SELECT * from movimentacoes"
+              modifyResponse $ setResponseStatus 200 "OK"
+              writeLazyText (encodeToLazyText res)
+
+            BackendRoute_ApagarMovimentacoes :/ mid -> method POST $ do
+              res :: [Movimentacoes] <- liftIO $ do
+                execute_ dbcon migrationMov
+                query dbcon "SELECT * from movimentacoes where id=?" (Only (mid :: Int))
+              if res /= [] then do
+                liftIO $ do
+                  execute_ dbcon migrationMov
+                  execute dbcon "DELETE from movimentacoes where id=?" (Only (mid :: Int))
+                modifyResponse $ setResponseStatus 200 "OK"
+              else
+                modifyResponse $ setResponseStatus 404 "NOT FOUND"
+
+            BackendRoute_BuscarMovimentacoes :/ mid -> method GET $ do
+              res :: [Movimentacoes] <- liftIO $ do
+                execute_ dbcon migrationMov
+                query dbcon "SELECT * from movimentacoes where id=?" (Only (mid :: Int))
+              if res /= [] then do
+                modifyResponse $ setResponseStatus 200 "OK"
+                writeLazyText (encodeToLazyText (Prelude.head res))
+              else
+                modifyResponse $ setResponseStatus 404 "NOT FOUND"
+
+            BackendRoute_Movimentacoes :/ () -> method POST $ do
+              movimentacoes <- A.decode <$> readRequestBody 2000
+              case movimentacoes of
+                Just mov -> do
+                  liftIO $ do
+                    execute_ dbcon migrationMov
+                    execute dbcon 
+                            "INSERT INTO movimentacoes (navio,movimentacao,dataInicio,dataFim) VALUES (?,?,?,?)" 
+                            (navio mov, movimentacao mov, dataInicio mov, dataFim mov)
                   modifyResponse $ setResponseStatus 200 "OK"
                 Nothing -> modifyResponse $ setResponseStatus 500 "Erro"
             _ -> return ()

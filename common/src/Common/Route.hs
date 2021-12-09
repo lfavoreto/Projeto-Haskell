@@ -31,6 +31,12 @@ data BackendRoute :: * -> * where
   BackendRoute_ApagarContainers :: BackendRoute Int
   BackendRoute_EditarContainers :: BackendRoute Int
 
+  BackendRoute_Movimentacoes :: BackendRoute ()
+  BackendRoute_ListarMovimentacoes :: BackendRoute ()
+  BackendRoute_BuscarMovimentacoes :: BackendRoute Int
+  BackendRoute_EditarMovimentacoes :: BackendRoute Int
+  BackendRoute_ApagarMovimentacoes :: BackendRoute Int
+
 data FrontendRoute :: * -> * where
   FrontendRoute_Main :: FrontendRoute ()
   -- This type is used to define frontend routes, i.e. ones for which the backend will serve the frontend.
@@ -51,7 +57,13 @@ fullRouteEncoder = mkFullRouteEncoder
       BackendRoute_ListarContainers -> PathSegment "listar-containers" $ unitEncoder mempty
       BackendRoute_BuscarContainers -> PathSegment "buscar-containers" readShowEncoder
       BackendRoute_ApagarContainers -> PathSegment "apagar-containers" readShowEncoder
-      BackendRoute_EditarContainers -> PathSegment "editar-containers" readShowEncoder)
+      BackendRoute_EditarContainers -> PathSegment "editar-containers" readShowEncoder
+
+      BackendRoute_Movimentacoes -> PathSegment "movimentacoes" $ unitEncoder mempty
+      BackendRoute_ListarMovimentacoes -> PathSegment "listar-movimentacoes" $ unitEncoder mempty
+      BackendRoute_BuscarMovimentacoes -> PathSegment "buscar-movimentacoes" readShowEncoder
+      BackendRoute_ApagarMovimentacoes -> PathSegment "apagar-movimentacoes" readShowEncoder
+      BackendRoute_EditarMovimentacoes -> PathSegment "editar-movimentacoes" readShowEncoder)
   (\case
       FrontendRoute_Main -> PathEnd $ unitEncoder mempty)
 
