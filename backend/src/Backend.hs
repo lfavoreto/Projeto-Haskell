@@ -28,6 +28,10 @@ migrationMov :: Query
 migrationMov = "CREATE TABLE IF NOT EXISTS movimentacoes\
   \ (id SERIAL PRIMARY KEY, navio TEXT NOT NULL, movimentacao TEXT NOT NULL, dataInicio TEXT NOT NULL, dataFim TEXT NOT NULL)"
 
+migrationDes :: Query
+migrationDes = "CREATE TABLE IF NOT EXISTS destinos\
+  \ (id SERIAL PRIMARY KEY, carga TEXT NOT NULL, bandeira TEXT NOT NULL, origem TEXT NOT NULL, destino TEXT NOT NULL)"
+
 backend :: Backend BackendRoute FrontendRoute
 backend = Backend
   { _backend_run = \serve -> do
@@ -138,6 +142,59 @@ backend = Backend
                             (navio mov, movimentacao mov, dataInicio mov, dataFim mov)
                   modifyResponse $ setResponseStatus 200 "OK"
                 Nothing -> modifyResponse $ setResponseStatus 500 "Erro"
+
+            BackendRoute_EditarDestinos :/ did -> method POST $ do
+              destinos <- A.decode <$> readRequestBody 2000
+              case destinos of
+                Just dest -> do
+                  liftIO $ do
+                    execute_ dbcon migrationDes
+                    execute dbcon "UPDATE destinos SET carga = ?, \
+                                  \ bandeira = ?, origem = ?, destino = ? WHERE id = ?"
+                                  (carga dest, bandeira dest, origem dest, destino dest, did)
+                  modifyResponse $ setResponseStatus 200 "OK"
+                Nothing -> modifyResponse $ setResponseStatus 500 "ERRO"
+                
+            BackendRoute_ListarDestinos :/ () -> method GET $ do
+              res :: [Destinos] <- liftIO $ do
+                execute_ dbcon migrationDes
+                query_ dbcon "SELECT * from destinos"
+              modifyResponse $ setResponseStatus 200 "OK"
+              writeLazyText (encodeToLazyText res)
+
+            BackendRoute_ApagarDestinos :/ did -> method POST $ do
+              res :: [Destinos] <- liftIO $ do
+                execute_ dbcon migrationDes
+                query dbcon "SELECT * from destinos where id=?" (Only (did :: Int))
+              if res /= [] then do
+                liftIO $ do
+                  execute_ dbcon migrationDes
+                  execute dbcon "DELETE from destinos where id=?" (Only (did :: Int))
+                modifyResponse $ setResponseStatus 200 "OK"
+              else
+                modifyResponse $ setResponseStatus 404 "NOT FOUND"
+
+            BackendRoute_BuscarDestinos :/ did -> method GET $ do
+              res :: [Destinos] <- liftIO $ do
+                execute_ dbcon migrationDes
+                query dbcon "SELECT * from destinos where id=?" (Only (did :: Int))
+              if res /= [] then do
+                modifyResponse $ setResponseStatus 200 "OK"
+                writeLazyText (encodeToLazyText (Prelude.head res))
+              else
+                modifyResponse $ setResponseStatus 404 "NOT FOUND"
+
+            BackendRoute_Destinos :/ () -> method POST $ do
+              destinos <- A.decode <$> readRequestBody 2000
+              case destinos of
+                Just dest -> do
+                  liftIO $ do
+                    execute_ dbcon migrationDes
+                    execute dbcon 
+                            "INSERT INTO destinos (carga,bandeira,origem,destino) VALUES (?,?,?,?)" 
+                            (carga dest, bandeira dest, origem dest, destino dest)
+                  modifyResponse $ setResponseStatus 200 "OK"
+                Nothing -> modifyResponse $ setResponseStatus 500 "Erro" 
             _ -> return ()
         return ()
   , _backend_routeEncoder = fullRouteEncoder

@@ -27,3 +27,11 @@ data Movimentacoes = Movimentacoes {
     dataInicio :: Text,
     dataFim :: Text
 } deriving (Generic, ToJSON, FromJSON, ToRow, FromRow, Eq, Show)
+
+data Destinos = Destinos {
+    idDestino :: Int,
+    carga :: Text,
+    bandeira :: Text,
+    origem :: Text,
+    destino :: Text
+} deriving (Generic, ToJSON, FromJSON, ToRow, FromRow, Eq, Show)
