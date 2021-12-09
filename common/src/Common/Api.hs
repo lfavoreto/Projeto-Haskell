@@ -10,5 +10,12 @@ module Common.Api where
 import Data.Aeson
 import Data.Text (Text)
 import GHC.Generics (Generic)
+import Database.PostgreSQL.Simple
 
-data Container = Container Text deriving (Generic, ToJSON, FromJSON)
+data Containers = Containers {
+    idContainer :: Int,
+    nomeContainer :: Text,
+    tipoContainer :: Text,
+    statusContainer :: Text,
+    categoriaContainer :: Text
+} deriving (Generic, ToJSON, FromJSON, ToRow, FromRow, Eq, Show)
